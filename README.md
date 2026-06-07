@@ -1,5 +1,7 @@
 # csv2prism
 
+[![CI](https://github.com/GerryFAN0706/csv2prism/actions/workflows/ci.yml/badge.svg)](https://github.com/GerryFAN0706/csv2prism/actions/workflows/ci.yml)
+
 Turn tidy **CSV** data into **editable GraphPad Prism** (`.pzfx`) files — one file
 per group of CSVs, one Prism **data table per CSV**, with the right table type
 chosen automatically. Open the file in Prism, click a table, **New Graph → pick a
