@@ -1,0 +1,4 @@
+# Python dependencies for build_prism.py (stage 2).
+# Stage 1 additionally needs R (>=4.0) with the 'pzfx' package: install.packages("pzfx")
+pandas>=1.3
+prismWriter @ git+https://github.com/smestern/prismWriter

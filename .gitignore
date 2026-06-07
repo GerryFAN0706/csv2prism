@@ -1,0 +1,20 @@
+# --- Generated Prism artifacts (reproducible from the CSVs; safe to ignore) ---
+*.pzfx
+MANIFEST.csv
+_routing.csv
+VALIDATION.md
+**/out/
+*.backup*
+
+# --- Python ---
+__pycache__/
+*.pyc
+
+# --- Never commit real data ---------------------------------------------------
+# Keep only synthetic example inputs under examples/. Put real cohort CSVs
+# somewhere ignored (e.g. data/) and pass it via --root. Uncomment to enforce:
+# data/
+# *.xlsx
+
+# Allow the synthetic demo inputs through the *.pzfx rule above (CSVs aren't ignored).
+!examples/Demo/*.csv

@@ -1,0 +1,4 @@
+gene,GeneA,GeneB,GeneC
+GeneA,1.00,0.62,0.41
+GeneB,0.62,1.00,0.55
+GeneC,0.41,0.55,1.00
