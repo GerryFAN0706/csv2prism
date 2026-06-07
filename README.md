@@ -60,7 +60,8 @@ Prism.
 3. Conventions the auto-typing uses:
    - a text column → Prism **row titles** (`*_display`/`*_label` preferred over
      raw codes; `*_internal`/`*_code` twins dropped);
-   - `ci_lo`/`ci_hi` → confidence-interval columns (a `ci_halfwidth` is added);
+   - low/high CI columns in any common spelling — `ci_lo`/`ci_hi`, `lo`/`hi`,
+     `x_lo`/`x_hi`, `lo_x`/`hi_x` — get a matching `*_halfwidth` added;
    - `*_vs_*` in the filename, or an ascending first numeric column → **XY**;
    - a square numeric block keyed by one label column → **heatmap**;
    - a balanced *entity × factor* crossing → a native **Grouped** table.

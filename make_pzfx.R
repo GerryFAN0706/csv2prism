@@ -63,15 +63,24 @@ drop_redundant_codes <- function(df) {
   df
 }
 
-# Append a "<prefix>ci_halfwidth" wherever a matching ci_lo / ci_hi pair exists.
+# Append a "<base>_halfwidth" column wherever a low/high CI pair exists. Handles the
+# common spellings: ci_lo/ci_hi, x_lo/x_hi, lo_x/hi_x, and bare lo/hi.
 add_ci_halfwidth <- function(df) {
-  nm <- names(df)
-  los <- grep("ci_lo$", nm, value = TRUE)
-  for (lo in los) {
-    hi <- sub("ci_lo$", "ci_hi", lo)
-    if (hi %in% nm && is.numeric(df[[lo]]) && is.numeric(df[[hi]])) {
-      pref <- sub("ci_lo$", "", lo)
-      df[[paste0(pref, "ci_halfwidth")]] <- (df[[hi]] - df[[lo]]) / 2
+  specs <- list(
+    list(pat = "ci_lo$", hi = function(x) sub("ci_lo$", "ci_hi", x), base = function(x) sub("ci_lo$", "", x)),
+    list(pat = "_lo$",   hi = function(x) sub("_lo$", "_hi", x),     base = function(x) sub("_lo$", "", x)),
+    list(pat = "^lo_",   hi = function(x) sub("^lo_", "hi_", x),     base = function(x) sub("^lo_", "", x)),
+    list(pat = "^lo$",   hi = function(x) "hi",                      base = function(x) "ci")
+  )
+  for (lo in names(df)) {
+    for (s in specs) if (grepl(s$pat, lo)) {
+      hi <- s$hi(lo)
+      if (hi %in% names(df) && is.numeric(df[[lo]]) && is.numeric(df[[hi]])) {
+        b   <- sub("_$", "", s$base(lo)); if (!nzchar(b)) b <- "ci"
+        col <- paste0(b, "_halfwidth")
+        if (!(col %in% names(df))) df[[col]] <- (df[[hi]] - df[[lo]]) / 2
+      }
+      break
     }
   }
   df
@@ -122,9 +131,10 @@ table_name <- function(path) {
   substr(b, 1, 60)
 }
 
-# The point-estimate column among numeric cols (not a CI / p / n / SE column).
+# The point-estimate column among numeric cols (not a CI / error / p / n column).
 estimate_col <- function(num_cols) {
-  bad  <- grepl("(^|_)ci_(lo|hi|halfwidth)$|^p$|^n$|(^|_)se$|^count$", num_cols, ignore.case = TRUE)
+  bad  <- grepl("^(lo|hi)(_|$)|(_|^)(lo|hi|sd|sem|se|p|n|count|halfwidth)$|ci_(lo|hi|halfwidth)$",
+                num_cols, ignore.case = TRUE)
   keep <- num_cols[!bad]
   if (length(keep)) keep[1] else num_cols[1]
 }
@@ -229,6 +239,14 @@ convert_folder <- function(folder) {
     })
     if (is.null(tb)) next
     nm <- table_name(p)
+    if (ncol(tb$data) == 0) {       # all-text CSV -> not a plottable Prism data table
+      message(sprintf("  - skip %-40s (no numeric columns)", nm))
+      rows[[nm]] <- data.frame(figure = fig, table = nm, kind = "skipped(no-data)",
+                               nrow = nrow(tb$data), ncol = 0L,
+                               note = "all-text CSV; not a Prism data table",
+                               stringsAsFactors = FALSE)
+      next
+    }
     if (nrow(tb$data) > ROW_CAP) {
       message(sprintf("  - skip %-40s %d rows (raw data; kept as CSV)", nm, nrow(tb$data)))
       rows[[nm]] <- data.frame(figure = fig, table = nm, kind = "skipped(raw)",
@@ -274,23 +292,23 @@ convert_folder <- function(folder) {
 has_csv <- function(d) length(list.files(d, pattern = "\\.csv$")) > 0
 
 run_all <- function() {
+# Discover every sub-folder that contains CSVs (or the root itself if it does).
+# Works for Fig*/SuppFig*/SF*/arbitrary names -- the name only drives ordering.
 all_dirs <- list.dirs(root, recursive = FALSE)
-folders  <- all_dirs[grepl("(^|/)(Supp)?Fig[0-9]+$", all_dirs)]
-if (length(folders)) {
-  # numeric-aware ordering: Fig2..Fig6 then SuppFig1..SuppFig10
-  ord <- order(grepl("SuppFig", basename(folders)),
-               as.integer(sub("\\D+", "", basename(folders))))
-  folders <- folders[ord]
-} else {
-  # generic mode: any subfolders with CSVs, else the root itself as a single figure
-  folders <- all_dirs[vapply(all_dirs, has_csv, logical(1))]
-  if (!length(folders) && has_csv(root)) folders <- root
-  if (!length(folders)) stop("no CSV files found under ", normalizePath(root))
-  message("(generic mode: no Fig*/SuppFig* folders; treating ", length(folders),
-          " CSV folder(s) as figures)")
-}
+# never ingest our own output dir (its MANIFEST.csv / _routing.csv are CSVs)
+all_dirs <- all_dirs[normalizePath(all_dirs, mustWork = FALSE) !=
+                     normalizePath(outdir, mustWork = FALSE)]
+folders  <- all_dirs[vapply(all_dirs, has_csv, logical(1))]
+if (!length(folders) && has_csv(root)) folders <- root
+if (!length(folders)) stop("no CSV files found under ", normalizePath(root))
 
-message("Converting ", length(folders), " figure folders -> ", normalizePath(outdir), "\n")
+bn      <- basename(folders)
+is_supp <- grepl("^(SF|S[0-9]|Supp)", bn, ignore.case = TRUE) & !grepl("^Fig", bn, ignore.case = TRUE)
+num     <- suppressWarnings(as.integer(gsub("\\D", "", bn))); num[is.na(num)] <- 0L
+folders <- folders[order(is_supp, num, bn)]                 # main figures first, then supp; numeric
+
+message("Converting ", length(folders), " folders (", sum(!is_supp), " main + ",
+        sum(is_supp), " supplementary) -> ", normalizePath(outdir), "\n")
 res      <- lapply(folders, convert_folder)
 manifest <- do.call(rbind, lapply(res, `[[`, "manifest"))
 routing  <- do.call(rbind, lapply(res, `[[`, "routing"))
